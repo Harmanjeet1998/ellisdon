@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELLISDON GATEHOUSE DELIVERY LOG</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: white;
+      box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #4CAF50;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    form label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    form input[type="text"],
+    form input[type="number"],
+    form input[type="time"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 100%;
+      font-size: 16px;
+      margin-bottom: 10px;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .table-container {
+      margin-top: 20px;
+      overflow-x: auto;
+      /* Allow horizontal scrolling on small screens */
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      table-layout: fixed;
+      /* Fix table layout */
+    }
+
+    table,
+    th,
+    td {
+      border: 1px solid #ddd;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      text-align: left;
+      word-wrap: break-word;
+      /* Allow wrapping of long text */
+    }
+
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .edit-btn {
+      background-color: #f39c12;
+      margin-right: 5px;
+    }
+
+    .edit-btn:hover {
+      background-color: #e67e22;
+    }
+
+    .exit-btn {
+      background-color: #e74c3c;
+    }
+
+    .exit-btn:hover {
+      background-color: #c0392b;
+    }
+
+    .footer {
+      position: relative;
+      text-align: right;
+      font-size: 10px;
+      color: #888;
+      margin-top: 20px;
+    }
+
+    @media (max-width: 600px) {
+      h2 {
+        font-size: 20px;
+      }
+
+      form input[type="text"],
+      form input[type="number"],
+      form input[type="time"] {
+        font-size: 14px;
+      }
+
+      button {
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h2>ELLISDON GATEHOUSE DELIVERY LOG</h2>
+
+    <form id="deliveryForm">
+      <label for="deliveryFor">Delivery For (Recipient)</label>
+      <input type="text" id="deliveryFor" name="deliveryFor" required>
+
+      <label for="deliveryFrom">Delivery From</label>
+      <input type="text" id="deliveryFrom" name="deliveryFrom" required>
+
+      <label for="badgeNumber">Issued Badge Number</label>
+      <input type="number" id="badgeNumber" name="badgeNumber" required>
+
+      <label for="timeEntry">Time of Entry</label>
+      <input type="time" id="timeEntry" name="timeEntry" required>
+
+      <label for="securityGuard">Security Guard Name</label>
+      <input type="text" id="securityGuard" name="securityGuard" required>
+
+      <button type="submit">Add Entry</button>
+    </form>
+
+    <div class="table-container">
+      <table id="logTable">
+        <thead>
+          <tr>
+            <th>Delivery From</th>
+            <th>Delivery For</th>
+            <th>Badge Number</th>
+            <th>Time of Entry</th>
+            <th>Time of Exit</th>
+            <th>Security Guard</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Rows will be added dynamically -->
+        </tbody>
+      </table>
+    </div>
+
+    <button onclick="generatePDF()">Download</button>
+    <div class="footer">Created by Harmanjeet Singh Nokwal</div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.18/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    const form = document.getElementById('deliveryForm');
+    const tableBody = document.querySelector('#logTable tbody');
+    let editIndex = null;
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+
+      const deliveryFor = document.getElementById('deliveryFor').value;
+      const deliveryFrom = document.getElementById('deliveryFrom').value;
+      const badgeNumber = document.getElementById('badgeNumber').value;
+      const timeEntry = document.getElementById('timeEntry').value;
+      const securityGuard = document.getElementById('securityGuard').value;
+
+      const currentDate = new Date();
+      const entryDateTime = new Date(`${currentDate.toLocaleDateString()} ${timeEntry}`);
+      const formattedEntryTime = entryDateTime.toLocaleString();
+
+      if (editIndex !== null) {
+        const row = tableBody.children[editIndex];
+        row.innerHTML = `
+                <td>${deliveryFrom}</td>
+                <td>${deliveryFor}</td>
+                <td>${badgeNumber}</td>
+                <td class="entryTime" data-time="${entryDateTime.getTime()}">${formattedEntryTime}</td>
+                <td class="timeExit">Not Marked</td>
+                <td>${securityGuard}</td>
+                <td>
+                    <button class="edit-btn" onclick="editEntry(${editIndex})">Edit</button>
+                    <button class="exit-btn" onclick="markExit(${editIndex})">Mark Exit</button>
+                </td>
+            `;
+        editIndex = null;
+      } else {
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+                <td>${deliveryFrom}</td>
+                <td>${deliveryFor}</td>
+                <td>${badgeNumber}</td>
+                <td class="entryTime" data-time="${entryDateTime.getTime()}">${formattedEntryTime}</td>
+                <td class="timeExit">Not Marked</td>
+                <td>${securityGuard}</td>
+                <td>
+                    <button class="edit-btn" onclick="editEntry(${tableBody.children.length})">Edit</button>
+                    <button class="exit-btn" onclick="markExit(${tableBody.children.length})">Mark Exit</button>
+                </td>
+            `;
+        tableBody.appendChild(newRow);
+      }
+
+      sortTableByTime();
+      form.reset();
+    });
+
+    function editEntry(index) {
+      const row = tableBody.children[index];
+      const cells = row.querySelectorAll('td');
+
+      document.getElementById('deliveryFrom').value = cells[0].textContent;
+      document.getElementById('deliveryFor').value = cells[1].textContent;
+      document.getElementById('badgeNumber').value = cells[2].textContent;
+      const entryTime = cells[3].textContent.split(', ')[1];
+      document.getElementById('timeEntry').value = entryTime.split(':')[0] + ':' + entryTime.split(':')[1];
+      document.getElementById('securityGuard').value = cells[5].textContent;
+
+      editIndex = index;
+    }
+
+    function markExit(index) {
+      const row = tableBody.children[index];
+      const exitCell = row.querySelector('.timeExit');
+
+      const currentDate = new Date();
+      const formattedExitTime = currentDate.toLocaleString();
+      exitCell.innerHTML = formattedExitTime;
+    }
+
+    function sortTableByTime() {
+      const rows = Array.from(tableBody.querySelectorAll('tr'));
+      rows.sort((a, b) => {
+        const timeA = parseInt(a.querySelector('.entryTime').dataset.time);
+        const timeB = parseInt(b.querySelector('.entryTime').dataset.time);
+        return timeA - timeB;
+      });
+      rows.forEach(row => tableBody.appendChild(row));
+    }
+
+    function generatePDF() {
+      const {jsPDF} = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(20);
+      doc.text("ELLISDON GATEHOUSE DELIVERY LOG", 15, 15);
+
+      const date = new Date();
+      const dateString = date.toLocaleString();
+      doc.setFontSize(12);
+      doc.text(`Date: ${dateString}`, 10, 20);
+
+      doc.text("", 10, 30); // Gap before table
+
+      const headers = ["Delivery From", "Delivery For", "Badge Number", "Time of Entry", "Time of Exit", "Security Guard"];
+      const rows = Array.from(tableBody.querySelectorAll('tr')).map(row => {
+        const cells = row.querySelectorAll('td');
+        return Array.from(cells).map(cell => cell.textContent);
+      });
+
+      doc.autoTable({head: [headers], body: rows, startY: 35});
+      doc.save('delivery_log.pdf');
+    }
+  </script>
+
+</body>
+
+</html>
