@@ -66,7 +66,6 @@
     .table-container {
       margin-top: 20px;
       overflow-x: auto;
-      /* Allow horizontal scrolling on small screens */
     }
 
     table {
@@ -74,7 +73,6 @@
       border-collapse: collapse;
       margin-bottom: 20px;
       table-layout: fixed;
-      /* Fix table layout */
     }
 
     table,
@@ -88,7 +86,6 @@
       padding: 10px;
       text-align: left;
       word-wrap: break-word;
-      /* Allow wrapping of long text */
     }
 
     th {
@@ -166,6 +163,7 @@
       <input type="text" id="securityGuard" name="securityGuard" required>
 
       <button type="submit">Add Entry</button>
+      <button type="button" id="resetEntries">Reset All Entries</button>
     </form>
 
     <div class="table-container">
@@ -198,9 +196,16 @@
     const tableBody = document.querySelector('#logTable tbody');
     let editIndex = null;
 
+    document.addEventListener('DOMContentLoaded', loadEntries);
+
     form.addEventListener('submit', function (event) {
       event.preventDefault();
+      addOrUpdateEntry();
+    });
 
+    document.getElementById('resetEntries').addEventListener('click', resetEntries);
+
+    function addOrUpdateEntry() {
       const deliveryFor = document.getElementById('deliveryFor').value;
       const deliveryFrom = document.getElementById('deliveryFrom').value;
       const badgeNumber = document.getElementById('badgeNumber').value;
@@ -244,67 +249,91 @@
       }
 
       sortTableByTime();
+      saveEntries();
       form.reset();
-    });
+    }
 
-    function editEntry(index) {
-      const row = tableBody.children[index];
-      const cells = row.querySelectorAll('td');
+    function saveEntries() {
+      const rows = Array.from(tableBody.querySelectorAll('tr'));
+      const entries = rows.map(row => {
+        const cells = row.querySelectorAll('td');
+        return {
+          deliveryFrom: cells[0].textContent,
+          deliveryFor: cells[1].textContent,
+          badgeNumber: cells[2].textContent,
+          entryTime: cells[3].dataset.time,
+          exitTime: cells[4].textContent,
+          securityGuard: cells[5].textContent
+        };
+      });
+      localStorage.setItem('deliveryEntries', JSON.stringify(entries));
+    }
 
-      document.getElementById('deliveryFrom').value = cells[0].textContent;
-      document.getElementById('deliveryFor').value = cells[1].textContent;
-      document.getElementById('badgeNumber').value = cells[2].textContent;
-      const entryTime = cells[3].textContent.split(', ')[1];
-      document.getElementById('timeEntry').value = entryTime.split(':')[0] + ':' + entryTime.split(':')[1];
-      document.getElementById('securityGuard').value = cells[5].textContent;
+    function loadEntries() {
+      const savedEntries = JSON.parse(localStorage.getItem('deliveryEntries')) || [];
+      savedEntries.forEach((entry, index) => {
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${entry.deliveryFrom}</td>
+            <td>${entry.deliveryFor}</td>
+            <td>${entry.badgeNumber}</td>
+            <td class="entryTime" data-time="${entry.entryTime}">${new Date(parseInt(entry.entryTime)).toLocaleString()}</td>
+            <td class="timeExit">${entry.exitTime}</td>
+            <td>${entry.securityGuard}</td>
+            <td>
+                <button class="edit-btn" onclick="editEntry(${index})">Edit</button>
+                <button class="exit-btn" onclick="markExit(${index})">Mark Exit</button>
+            </td>
+        `;
+        tableBody.appendChild(newRow);
+      });
+      sortTableByTime();
+    }
 
-      editIndex = index;
+    function resetEntries() {
+      localStorage.removeItem('deliveryEntries');
+      tableBody.innerHTML = '';
+    }
+
+    function sortTableByTime() {
+      const rows = Array.from(tableBody.children);
+      rows.sort((a, b) => {
+        const timeA = a.querySelector('.entryTime').dataset.time;
+        const timeB = b.querySelector('.entryTime').dataset.time;
+        return new Date(timeA) - new Date(timeB);
+      });
+
+      rows.forEach(row => tableBody.appendChild(row));
     }
 
     function markExit(index) {
       const row = tableBody.children[index];
       const exitCell = row.querySelector('.timeExit');
-
-      const currentDate = new Date();
-      const formattedExitTime = currentDate.toLocaleString();
-      exitCell.innerHTML = formattedExitTime;
+      const timeNow = new Date();
+      exitCell.textContent = timeNow.toLocaleString();
+      saveEntries();
     }
 
-    function sortTableByTime() {
-      const rows = Array.from(tableBody.querySelectorAll('tr'));
-      rows.sort((a, b) => {
-        const timeA = parseInt(a.querySelector('.entryTime').dataset.time);
-        const timeB = parseInt(b.querySelector('.entryTime').dataset.time);
-        return timeA - timeB;
-      });
-      rows.forEach(row => tableBody.appendChild(row));
+    function editEntry(index) {
+      const row = tableBody.children[index];
+      document.getElementById('deliveryFrom').value = row.children[0].textContent;
+      document.getElementById('deliveryFor').value = row.children[1].textContent;
+      document.getElementById('badgeNumber').value = row.children[2].textContent;
+      const entryTime = row.querySelector('.entryTime').dataset.time;
+      document.getElementById('timeEntry').value = new Date(parseInt(entryTime)).toISOString().slice(11, 16);
+      document.getElementById('securityGuard').value = row.children[5].textContent;
+
+      editIndex = index;
     }
 
     function generatePDF() {
-      const {jsPDF} = window.jspdf;
+      const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-
-      doc.setFontSize(20);
-      doc.text("ELLISDON GATEHOUSE DELIVERY LOG", 15, 15);
-
-      const date = new Date();
-      const dateString = date.toLocaleString();
-      doc.setFontSize(12);
-      doc.text(`Date: ${dateString}`, 10, 20);
-
-      doc.text("", 10, 30); // Gap before table
-
-      const headers = ["Delivery From", "Delivery For", "Badge Number", "Time of Entry", "Time of Exit", "Security Guard"];
-      const rows = Array.from(tableBody.querySelectorAll('tr')).map(row => {
-        const cells = row.querySelectorAll('td');
-        return Array.from(cells).map(cell => cell.textContent);
-      });
-
-      doc.autoTable({head: [headers], body: rows, startY: 35});
+      doc.text('Ellisdon Gatehouse Delivery Log', 10, 10);
+      doc.autoTable({ html: '#logTable' });
       doc.save('delivery_log.pdf');
     }
   </script>
-
 </body>
 
 </html>
