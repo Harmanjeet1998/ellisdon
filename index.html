@@ -159,6 +159,9 @@
       <label for="timeEntry">Time of Entry</label>
       <input type="time" id="timeEntry" name="timeEntry" required>
 
+      <label for="timeExit">Time of Exit (Optional)</label>
+      <input type="time" id="timeExit" name="timeExit" class="optional">
+
       <label for="securityGuard">Security Guard Name</label>
       <input type="text" id="securityGuard" name="securityGuard" required>
 
@@ -211,10 +214,17 @@
       const badgeNumber = document.getElementById('badgeNumber').value;
       const timeEntry = document.getElementById('timeEntry').value;
       const securityGuard = document.getElementById('securityGuard').value;
+      const timeExit = document.getElementById('timeExit').value;
 
       const currentDate = new Date();
       const entryDateTime = new Date(`${currentDate.toLocaleDateString()} ${timeEntry}`);
       const formattedEntryTime = entryDateTime.toLocaleString();
+      let formattedExitTime = "Not Marked";
+
+      if (timeExit) {
+        const exitDateTime = new Date(`${currentDate.toLocaleDateString()} ${timeExit}`);
+        formattedExitTime = exitDateTime.toLocaleString();
+      }
 
       if (editIndex !== null) {
         const row = tableBody.children[editIndex];
@@ -223,7 +233,7 @@
                 <td>${deliveryFor}</td>
                 <td>${badgeNumber}</td>
                 <td class="entryTime" data-time="${entryDateTime.getTime()}">${formattedEntryTime}</td>
-                <td class="timeExit">Not Marked</td>
+                <td class="timeExit">${formattedExitTime}</td>
                 <td>${securityGuard}</td>
                 <td>
                     <button class="edit-btn" onclick="editEntry(${editIndex})">Edit</button>
@@ -238,7 +248,7 @@
                 <td>${deliveryFor}</td>
                 <td>${badgeNumber}</td>
                 <td class="entryTime" data-time="${entryDateTime.getTime()}">${formattedEntryTime}</td>
-                <td class="timeExit">Not Marked</td>
+                <td class="timeExit">${formattedExitTime}</td>
                 <td>${securityGuard}</td>
                 <td>
                     <button class="edit-btn" onclick="editEntry(${tableBody.children.length})">Edit</button>
@@ -254,17 +264,17 @@
     }
 
     function saveEntries() {
-      const rows = Array.from(tableBody.querySelectorAll('tr'));
-      const entries = rows.map(row => {
-        const cells = row.querySelectorAll('td');
-        return {
-          deliveryFrom: cells[0].textContent,
-          deliveryFor: cells[1].textContent,
-          badgeNumber: cells[2].textContent,
-          entryTime: cells[3].dataset.time,
-          exitTime: cells[4].textContent,
-          securityGuard: cells[5].textContent
+      const entries = [];
+      tableBody.querySelectorAll('tr').forEach(row => {
+        const entry = {
+          deliveryFrom: row.children[0].textContent,
+          deliveryFor: row.children[1].textContent,
+          badgeNumber: row.children[2].textContent,
+          entryTime: row.querySelector('.entryTime').dataset.time,
+          exitTime: row.querySelector('.timeExit').textContent,
+          securityGuard: row.children[5].textContent,
         };
+        entries.push(entry);
       });
       localStorage.setItem('deliveryEntries', JSON.stringify(entries));
     }
@@ -300,7 +310,7 @@
       rows.sort((a, b) => {
         const timeA = a.querySelector('.entryTime').dataset.time;
         const timeB = b.querySelector('.entryTime').dataset.time;
-        return new Date(timeA) - new Date(timeB);
+        return new Date(parseInt(timeA)) - new Date(parseInt(timeB));
       });
 
       rows.forEach(row => tableBody.appendChild(row));
@@ -321,6 +331,15 @@
       document.getElementById('badgeNumber').value = row.children[2].textContent;
       const entryTime = row.querySelector('.entryTime').dataset.time;
       document.getElementById('timeEntry').value = new Date(parseInt(entryTime)).toISOString().slice(11, 16);
+
+      const exitTimeText = row.querySelector('.timeExit').textContent;
+      if (exitTimeText !== "Not Marked") {
+        const exitTime = new Date(exitTimeText);
+        document.getElementById('timeExit').value = exitTime.toISOString().slice(11, 16);
+      } else {
+        document.getElementById('timeExit').value = '';
+      }
+
       document.getElementById('securityGuard').value = row.children[5].textContent;
 
       editIndex = index;
@@ -334,6 +353,7 @@
       doc.save('delivery_log.pdf');
     }
   </script>
+
 </body>
 
 </html>
