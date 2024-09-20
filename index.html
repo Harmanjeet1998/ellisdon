@@ -37,7 +37,7 @@
 
     form input[type="text"],
     form input[type="number"],
-    form input[type="time"] {
+    form input[type="datetime-local"] {
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
@@ -125,7 +125,7 @@
 
       form input[type="text"],
       form input[type="number"],
-      form input[type="time"] {
+      form input[type="datetime-local"] {
         font-size: 14px;
       }
 
@@ -153,20 +153,20 @@
       <label for="deliveryFrom">Delivery From</label>
       <input type="text" id="deliveryFrom" name="deliveryFrom" required>
 
-      <label for="badgeNumber">Badge Number</label>
+      <label for="badgeNumber">Issued Badge Number</label>
       <input type="number" id="badgeNumber" name="badgeNumber" required>
 
-      <label for="timeEntry">Time of Entry</label>
-      <input type="time" id="timeEntry" name="timeEntry" required>
+      <label for="timeEntry">Date and Time of Entry</label>
+      <input type="datetime-local" id="timeEntry" name="timeEntry" required>
 
-      <label for="timeExit">Time of Exit (Optional)</label>
-      <input type="time" id="timeExit" name="timeExit" class="optional">
+      <label for="timeExit">Date and Time of Exit (Optional)</label>
+      <input type="datetime-local" id="timeExit" name="timeExit">
 
       <label for="securityGuard">Security Guard Name</label>
       <input type="text" id="securityGuard" name="securityGuard" required>
 
       <button type="submit">Add Entry</button>
-      <button type="button" id="resetEntries">Reset All Entries</button>
+      <button type="button" onclick="clearAllEntries()">Clear All Entries</button>
     </form>
 
     <div class="table-container">
@@ -176,8 +176,8 @@
             <th>Delivery From</th>
             <th>Delivery For</th>
             <th>Badge Number</th>
-            <th>Time of Entry</th>
-            <th>Time of Exit</th>
+            <th>Date and Time of Entry</th>
+            <th>Date and Time of Exit</th>
             <th>Security Guard</th>
             <th>Actions</th>
           </tr>
@@ -199,158 +199,155 @@
     const tableBody = document.querySelector('#logTable tbody');
     let editIndex = null;
 
-    document.addEventListener('DOMContentLoaded', loadEntries);
+    // Load existing entries from localStorage
+    window.onload = function() {
+      const savedEntries = JSON.parse(localStorage.getItem('deliveryLogEntries')) || [];
+      savedEntries.forEach((entry, index) => addRowToTable(entry, index));
+    };
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
-      addOrUpdateEntry();
-    });
 
-    document.getElementById('resetEntries').addEventListener('click', resetEntries);
-
-    function addOrUpdateEntry() {
       const deliveryFor = document.getElementById('deliveryFor').value;
       const deliveryFrom = document.getElementById('deliveryFrom').value;
       const badgeNumber = document.getElementById('badgeNumber').value;
       const timeEntry = document.getElementById('timeEntry').value;
+      const timeExit = document.getElementById('timeExit').value || "Not Marked"; // Default to "Not Marked" if empty
       const securityGuard = document.getElementById('securityGuard').value;
-      const timeExit = document.getElementById('timeExit').value;
 
-      const currentDate = new Date();
-      const entryDateTime = new Date(`${currentDate.toLocaleDateString()} ${timeEntry}`);
-      const formattedEntryTime = entryDateTime.toLocaleString();
-      let formattedExitTime = "Not Marked";
+      const formattedEntryTime = new Date(timeEntry).toLocaleString();
+      const formattedExitTime = timeExit !== "Not Marked" ? new Date(timeExit).toLocaleString() : "Not Marked";
 
-      if (timeExit) {
-        const exitDateTime = new Date(`${currentDate.toLocaleDateString()} ${timeExit}`);
-        formattedExitTime = exitDateTime.toLocaleString();
-      }
+      const entry = {
+        deliveryFrom,
+        deliveryFor,
+        badgeNumber,
+        timeEntry: formattedEntryTime,
+        timeExit: formattedExitTime,
+        securityGuard
+      };
 
       if (editIndex !== null) {
         const row = tableBody.children[editIndex];
-        row.innerHTML = `
-                <td>${deliveryFrom}</td>
-                <td>${deliveryFor}</td>
-                <td>${badgeNumber}</td>
-                <td class="entryTime" data-time="${entryDateTime.getTime()}">${formattedEntryTime}</td>
-                <td class="timeExit">${formattedExitTime}</td>
-                <td>${securityGuard}</td>
-                <td>
-                    <button class="edit-btn" onclick="editEntry(${editIndex})">Edit</button>
-                    <button class="exit-btn" onclick="markExit(${editIndex})">Mark Exit</button>
-                </td>
-            `;
+        updateRow(row, entry);
         editIndex = null;
       } else {
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `
-                <td>${deliveryFrom}</td>
-                <td>${deliveryFor}</td>
-                <td>${badgeNumber}</td>
-                <td class="entryTime" data-time="${entryDateTime.getTime()}">${formattedEntryTime}</td>
-                <td class="timeExit">${formattedExitTime}</td>
-                <td>${securityGuard}</td>
-                <td>
-                    <button class="edit-btn" onclick="editEntry(${tableBody.children.length})">Edit</button>
-                    <button class="exit-btn" onclick="markExit(${tableBody.children.length})">Mark Exit</button>
-                </td>
-            `;
-        tableBody.appendChild(newRow);
+        addRowToTable(entry, tableBody.children.length);
       }
 
-      sortTableByTime();
       saveEntries();
-      form.reset();
-    }
-
-    function saveEntries() {
-      const entries = [];
-      tableBody.querySelectorAll('tr').forEach(row => {
-        const entry = {
-          deliveryFrom: row.children[0].textContent,
-          deliveryFor: row.children[1].textContent,
-          badgeNumber: row.children[2].textContent,
-          entryTime: row.querySelector('.entryTime').dataset.time,
-          exitTime: row.querySelector('.timeExit').textContent,
-          securityGuard: row.children[5].textContent,
-        };
-        entries.push(entry);
-      });
-      localStorage.setItem('deliveryEntries', JSON.stringify(entries));
-    }
-
-    function loadEntries() {
-      const savedEntries = JSON.parse(localStorage.getItem('deliveryEntries')) || [];
-      savedEntries.forEach((entry, index) => {
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `
-            <td>${entry.deliveryFrom}</td>
-            <td>${entry.deliveryFor}</td>
-            <td>${entry.badgeNumber}</td>
-            <td class="entryTime" data-time="${entry.entryTime}">${new Date(parseInt(entry.entryTime)).toLocaleString()}</td>
-            <td class="timeExit">${entry.exitTime}</td>
-            <td>${entry.securityGuard}</td>
-            <td>
-                <button class="edit-btn" onclick="editEntry(${index})">Edit</button>
-                <button class="exit-btn" onclick="markExit(${index})">Mark Exit</button>
-            </td>
-        `;
-        tableBody.appendChild(newRow);
-      });
       sortTableByTime();
+      form.reset();
+    });
+
+    function addRowToTable(entry, index) {
+      const newRow = document.createElement('tr');
+      newRow.innerHTML = `
+        <td>${entry.deliveryFrom}</td>
+        <td>${entry.deliveryFor}</td>
+        <td>${entry.badgeNumber}</td>
+        <td>${entry.timeEntry}</td>
+        <td class="timeExit">${entry.timeExit}</td>
+        <td>${entry.securityGuard}</td>
+        <td>
+          <button class="edit-btn" onclick="editEntry(${index})">Edit</button>
+          <button class="exit-btn" onclick="markExit(${index})">Exit</button>
+        </td>
+      `;
+      tableBody.appendChild(newRow);
     }
 
-    function resetEntries() {
-      localStorage.removeItem('deliveryEntries');
-      tableBody.innerHTML = '';
+    function updateRow(row, entry) {
+      row.innerHTML = `
+        <td>${entry.deliveryFrom}</td>
+        <td>${entry.deliveryFor}</td>
+        <td>${entry.badgeNumber}</td>
+        <td>${entry.timeEntry}</td>
+        <td class="timeExit">${entry.timeExit}</td>
+        <td>${entry.securityGuard}</td>
+        <td>
+          <button class="edit-btn" onclick="editEntry(${editIndex})">Edit</button>
+          <button class="exit-btn" onclick="markExit(${editIndex})">Mark Exit</button>
+        </td>
+      `;
     }
 
-    function sortTableByTime() {
-      const rows = Array.from(tableBody.children);
-      rows.sort((a, b) => {
-        const timeA = a.querySelector('.entryTime').dataset.time;
-        const timeB = b.querySelector('.entryTime').dataset.time;
-        return new Date(parseInt(timeA)) - new Date(parseInt(timeB));
-      });
+    function editEntry(index) {
+      const row = tableBody.children[index];
+      const cells = row.querySelectorAll('td');
 
-      rows.forEach(row => tableBody.appendChild(row));
+      document.getElementById('deliveryFrom').value = cells[0].textContent;
+      document.getElementById('deliveryFor').value = cells[1].textContent;
+      document.getElementById('badgeNumber').value = cells[2].textContent;
+      const entryDateTime = new Date(cells[3].textContent);
+      document.getElementById('timeEntry').value = entryDateTime.toISOString().slice(0, 16); // Convert to datetime-local format
+      const exitDateTime = cells[4].textContent === "Not Marked" ? "" : new Date(cells[4].textContent);
+      document.getElementById('timeExit').value = exitDateTime ? exitDateTime.toISOString().slice(0, 16) : ""; // Convert to datetime-local format
+      document.getElementById('securityGuard').value = cells[5].textContent;
+
+      editIndex = index;
     }
 
     function markExit(index) {
       const row = tableBody.children[index];
       const exitCell = row.querySelector('.timeExit');
-      const timeNow = new Date();
-      exitCell.textContent = timeNow.toLocaleString();
+      const currentDate = new Date();
+      exitCell.innerHTML = currentDate.toLocaleString();
       saveEntries();
     }
 
-    function editEntry(index) {
-      const row = tableBody.children[index];
-      document.getElementById('deliveryFrom').value = row.children[0].textContent;
-      document.getElementById('deliveryFor').value = row.children[1].textContent;
-      document.getElementById('badgeNumber').value = row.children[2].textContent;
-      const entryTime = row.querySelector('.entryTime').dataset.time;
-      document.getElementById('timeEntry').value = new Date(parseInt(entryTime)).toISOString().slice(11, 16);
-
-      const exitTimeText = row.querySelector('.timeExit').textContent;
-      if (exitTimeText !== "Not Marked") {
-        const exitTime = new Date(exitTimeText);
-        document.getElementById('timeExit').value = exitTime.toISOString().slice(11, 16);
-      } else {
-        document.getElementById('timeExit').value = '';
-      }
-
-      document.getElementById('securityGuard').value = row.children[5].textContent;
-
-      editIndex = index;
+    function sortTableByTime() {
+      const rows = Array.from(tableBody.querySelectorAll('tr'));
+      rows.sort((a, b) => {
+        const timeA = new Date(a.querySelector('td:nth-child(4)').textContent).getTime();
+        const timeB = new Date(b.querySelector('td:nth-child(4)').textContent).getTime();
+        return timeA - timeB;
+      });
+      rows.forEach(row => tableBody.appendChild(row));
     }
 
     function generatePDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      doc.text('Ellisdon Gatehouse Delivery Log', 10, 10);
-      doc.autoTable({ html: '#logTable' });
+
+      doc.setFontSize(20);
+      doc.text("ELLISDON GATEHOUSE DELIVERY LOG", 15, 15);
+
+      const date = new Date();
+      const dateString = date.toLocaleString();
+      doc.setFontSize(12);
+      doc.text(`Date: ${dateString}`, 10, 20);
+
+      doc.text("", 10, 30); // Gap before table
+
+      const headers = ["Delivery From", "Delivery For", "Badge Number", "Date and Time of Entry", "Date and Time of Exit", "Security Guard"];
+      const rows = Array.from(tableBody.querySelectorAll('tr')).map(row => {
+        const cells = row.querySelectorAll('td');
+        return Array.from(cells).map(cell => cell.textContent);
+      });
+
+      doc.autoTable({ head: [headers], body: rows, startY: 35 });
       doc.save('delivery_log.pdf');
+    }
+
+    function saveEntries() {
+      const entries = Array.from(tableBody.querySelectorAll('tr')).map(row => {
+        const cells = row.querySelectorAll('td');
+        return {
+          deliveryFrom: cells[0].textContent,
+          deliveryFor: cells[1].textContent,
+          badgeNumber: cells[2].textContent,
+          timeEntry: cells[3].textContent,
+          timeExit: cells[4].textContent,
+          securityGuard: cells[5].textContent
+        };
+      });
+      localStorage.setItem('deliveryLogEntries', JSON.stringify(entries));
+    }
+
+    function clearAllEntries() {
+      tableBody.innerHTML = ''; // Clear table
+      localStorage.removeItem('deliveryLogEntries'); // Clear local storage
     }
   </script>
 
